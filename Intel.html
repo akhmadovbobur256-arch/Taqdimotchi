@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AI Slayd Yaratuvchi</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f2f5fb;padding:16px}
+  .card{background:#fff;padding:16px;border-radius:10px;max-width:900px;margin:12px auto;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+  input,select,textarea{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ddd}
+  button{padding:10px 14px;border-radius:8px;border:none;background:#0b84ff;color:#fff;cursor:pointer}
+  .slides{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+  .slide{background:#0e1724;color:#fff;padding:18px;border-radius:10px;min-height:180px;position:relative}
+  .slide img{max-width:100%;border-radius:8px;margin-top:10px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>AI Slayd Yaratuvchi</h2>
+  <label>Mavzu yoki taqdimot sarlavhasi:</label>
+  <input id="topic" placeholder="Masalan: Iqlim o'zgarishi" />
+  <div class="controls">
+    <button id="generate">Generatsiya qil (matn + rasm)</button>
+    <button id="clear" style="background:#eee;color:#111">Tozalash</button>
+  </div>
+
+  <div id="status" style="margin-top:10px;color:#666"></div>
+
+  <div class="slides" id="slides"></div>
+</div>
+
+<script>
+const backend = "https://YOUR_BACKEND_URL"; // backend manzilingizni shu yerga qo'ying
+
+document.getElementById('generate').onclick = async () => {
+  const topic = document.getElementById('topic').value.trim();
+  if(!topic){ alert('Mavzu kiriting'); return; }
+  document.getElementById('status').textContent = 'Matn yaratilmoqda...';
+  // 1) Matnni so'raymiz
+  const tResp = await fetch(backend + '/api/generate-text', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ topic })
+  });
+  const tJson = await tResp.json();
+  if(tJson.error){ alert(tJson.error); return; }
+  const text = tJson.text || "";
+  // matnni qatrlarga ajratamiz (har bir slayd uchun)
+  const slidesText = text.split(/\n+/).filter(s=>s.trim());
+  const slidesElem = document.getElementById('slides');
+  slidesElem.innerHTML = '';
+  for(let i=0;i<slidesText.length;i++){
+    const s = slidesText[i];
+    // har slayd uchun rasm promptini tayyorlaymiz
+    const imagePrompt = `${s}. Illustration for a presentation slide about "${topic}". Clean simple modern flat style, high quality.`;
+    document.getElementById('status').textContent = `Rasm ${i+1}/${slidesText.length} generatsiya qilinyapti...`;
+    const imgResp = await fetch(backend + '/api/generate-image', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt: imagePrompt })
+    });
+    const imgJson = await imgResp.json();
+    const imgUrl = imgJson.image || '';
+    // slide card
+    const div = document.createElement('div');
+    div.className = 'slide';
+    div.innerHTML = `<strong>Slayd ${i+1}</strong><p style="color:#dfe9ff">${s}</p>`;
+    if(imgUrl){
+      const img = document.createElement('img');
+      img.src = imgUrl;
+      div.appendChild(img);
+    }
+    slidesElem.appendChild(div);
+  }
+  document.getElementById('status').textContent = 'Tayyor!';
+};
+
+document.getElementById('clear').onclick = ()=>{
+  document.getElementById('topic').value = '';
+  document.getElementById('slides').innerHTML = '';
+  document.getElementById('status').textContent = '';
+};
+</script>
+</body>
+</html>
